@@ -10,7 +10,7 @@ service restart 1
 8031 8032 8034
 
 
-vi t.sh
+vi tomcat_mgmt.sh
 i
 
 #/bin/bash
