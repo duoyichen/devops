@@ -4,20 +4,20 @@
 
 虚拟机准备
 
-VM1：
-	cpu：1 core
-	memory： 1G
-	disk：30G
-	network：
-	    eth0：VirtualBox Host-Only Ethernet Adapter #2,
-	    eth1:NAT
-VM2：
-	cpu：1 core
-	memory： 1G
-	disk：8G
-	network：
-	    eth0：VirtualBox Host-Only Ethernet Adapter #2,
-	    eth1:NAT
+VM1： <br>
+	cpu：1 core <br>
+	memory： 1G <br>
+	disk：30G <br>
+	network： <br>
+	    eth0：VirtualBox Host-Only Ethernet Adapter #2, <br>
+	    eth1:NAT <br>
+VM2： <br>
+	cpu：1 core <br>
+	memory： 1G <br>
+	disk：8G <br>
+	network： <br>
+	    eth0：VirtualBox Host-Only Ethernet Adapter #2, <br>
+	    eth1:NAT <br>
 
 网络准备
 
