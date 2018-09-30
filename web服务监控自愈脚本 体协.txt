@@ -1,0 +1,166 @@
+
+vi web_monitor.sh
+i
+
+#! /bin/bash
+
+
+mail_list="chenying@cloudmind.com"
+mail_list_copy=" chenying@cloudmind.com duoyichen@qq.com"
+
+rm -rf /root/o/index.jsp
+
+wget -T 10 -t 3 -q -P /root/o http://www.nssc.org.cn/pages/portal/index.jsp 
+
+if [ ! -e /root/o/index.jsp ];then
+    date1=`date "+%Y-%m-%d %H:%M:%S"`
+    result_file='/root/o/mail.txt'
+    subject="Web Server is down!($date1)"
+    echo "$date1" >> /root/o/1.txt
+    echo "$date1" > /root/o/mail.txt
+    #free -g >> /root/o/1.txt
+    echo "Tomcat is Filed!"  >> /root/o/1.txt
+    echo "Tomcat is Filed!"  >> /root/o/mail.txt
+    ping -c 3 www.baidu.com >> /root/o/mail.txt
+    sh /usr/local/apache-tomcat-7.0.30/bin/shutdown.sh && echo "Tomcat stopped" >>/root/o/1.txt
+    sleep 8
+    sh /usr/local/apache-tomcat-7.0.30/bin/startup.sh && echo "Tomcat Restarted" >>/root/o/1.txt &&  echo "Tomcat Restarted" >> /root/o/mail.txt
+    mail -s "$subject" -c "$mail_list_copy" "$mail_list" < ${result_file}
+    #mail -s "$subject" -a ${result_file} -c "$mail_list_copy" "$mail_list" < ${result_file}
+    #free -g >> /root/o/1.txt
+#else
+#    echo "Tomcat is running!" >> /root/o/1.txt
+fi
+
+
+
+vi web_monitor_tixie.sh
+i
+#! /bin/bash
+
+
+mail_list="chenying@cloudmind.cn"
+mail_list_copy="linda.wang@cloudmind.cn duoyichen@qq.com"
+
+rm -rf /root/o/index.jsp
+
+wget -T 10 -t 3 -q -P /root/o http://www.nssc.org.cn/pages/portal/index.jsp 
+
+if [ -e /root/o/index.jsp ];then
+    date1=`date "+%Y-%m-%d %H:%M:%S"`
+    result_file='/root/o/mail.txt'
+    subject="体协网站访问已经恢复正常!($date1)"
+    echo "$date1: 领导好！体协网站访问已经恢复正常了!" > /root/o/mail.txt
+    mail -s "$subject" -c "$mail_list_copy" "$mail_list" < ${result_file}
+fi
+
+
+
+
+
+
+vi web_monitor_tixie.py
+i
+#!/usr/bin/env python 
+# coding:UTF-8 
+import time
+import pexpect
+import smtplib
+from email.mime.text import MIMEText
+import urllib
+
+
+mail_host = "smtp.163.com"
+mail_from = "duoyichen@163.com"
+mail_pass = "password"
+mail_to = "duoyichen@qq.com"
+mail_cc = "chenying@cloudmind.cn"
+
+
+def Mail():
+    date = time.strftime('%Y%m%d - %H: %M: %S')
+    msg = MIMEText("%s:  报告领导，体协网站已经恢复正常了！" %(date))
+    msg['Subject'] = "%s  体协网站已经恢复正常！" % (date)
+    msg['From'] = mail_from
+    msg['To'] = mail_to
+    msg['Cc'] = mail_cc
+    try:
+        s = smtplib.SMTP()
+        s.connect(mail_host, "25")
+        s.starttls()
+        s.login(mail_from,mail_pass)
+        s.sendmail(mail_from, mail_to.split(',') + mail_cc.split(','), msg.as_string())
+        s.quit()
+    except Exception, e:
+        print str(e)
+
+
+
+status=urllib.urlopen("http://www.nssc.org.cn/pages/portal/index.jsp").code
+print(status)
+
+#Mail()
+
+
+
+
+
+
+
+
+
+
+
+体协的网站我看了，应该不是系统的问题，是程序导致的。
+我写了个脚本，每分钟测试一下，如果网站挂了就自动给他恢复。
+
+
+
+
+
+
+
+
+
+import urllib
+
+status=urllib.urlopen("http://o.cloudmind.cn").code
+print status
+
+
+
+
+
+
+
+vi test_web2.py
+i
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from urllib.request import urlopen
+
+url = 'http://www.baidu.com'
+resp = urlopen(url)
+code = resp.getcode()
+print('the result is :', code)
+
+
+
+
+
+
+vi tomcat_check.sh
+i
+#! /bin/bash
+
+rm -rf index.html
+wget -T 10 -t 3 -q http://o.cloudmind.cn/index.html
+
+if [ ! -e index.html ];then
+  date >> /root/1.txt
+  echo "TOMCAT IS Filed" >> /root/1.txt
+  sh /usr/local/apache-tomcat-7.0.30/bin/startup.sh
+else
+  echo "TOMCAT IS RUNNING" >> /root/1.txt
+fi

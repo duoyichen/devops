@@ -1,0 +1,615 @@
+环境：支持CentOS-6.x-x86_64，Redhat-6.x-x86_64等平台，支持点到点，点到站。
+要求：VPN Server外网需要开放1194端口，VPN Server 和 VPN Client需要能够上网。
+
+请在VPN Server上任意目录创建本脚本，并在该目录下执行脚本。
+
+为了解决时间同步的问题，脚本会自动修改服务器端和客户端的的时区，并同步时间。如果安装失败请看报错信息，一般是YUM源的问题。6.5 以下版本可能会有YUM源的问题，如果出现YUM源的问题，需要修改脚本。
+
+
+
+
+
+vi openvpn_install.sh
+i
+
+
+
+#!/bin/bash
+
+# Author: DuoyiChen
+# QQ: 276820370
+# Date: 2016.09.13
+# Versin: 2.6.3
+# Platform: CentOS-6.x-x86_64, Redhat-6.x-x86_64, the vpn server's Extenal IP must open 1194 port
+# Purpose: One key install VPN
+
+
+
+################
+
+pwds=`pwd`
+install_switch=0
+
+os_arch=$(uname -m)
+if [ "${os_arch}" != "x86_64" ]; then echo -e "\n\033[32mThis script must run on x86_64 Arch!\033[0m\n";exit 2;fi
+
+openvpn_install_expect_echo_switch=1
+get_info_form_user_switch=1
+install_rpms_switch=1
+add_user_server_switch=1
+install_client_switch=1
+set_point_to_site_switch=1
+#http_mirrors_epel="http://epel.mirror.net.in/epel/6/x86_64/epel-release-6-8.noarch.rpm"
+http_mirrors_epel="http://mirrors.ustc.edu.cn/epel/6/x86_64/epel-release-6-8.noarch.rpm"
+#http_mirrors_epel="http://mirrors.aliyun.com/epel/6/x86_64/epel-release-6-8.noarch.rpm"
+
+
+config_path=/etc/openvpn
+easy_rsa_path="${config_path}/easy-rsa"
+keys_path=${easy_rsa_path}/keys
+server_ext_ip=`curl whatismyip.akamai.com`
+
+client_ext_ip="123.58.251.111"
+#client_ext_ip="175.25.48.225"
+client_ext_ssh_port="22"
+client_host_user="root"
+#client_host_user_password="12345678Cm"
+client_host_user_password="myhost"
+vpn_user_client=client1
+
+
+
+################
+
+get_info_form_user()
+{
+    #server_ext_ip=`curl whatismyip.akamai.com`
+    echo ""
+    printf "Please input \33[;31mVPN Server's Extnnal Network's IP:\33[0m (default is: \33[;31m"${server_ext_ip}"\33[0m):"
+    read -t 60 server_ext_ip_input
+    if [ "$server_ext_ip_input" != "" ]
+    then
+    server_ext_ip=${server_ext_ip_input}
+    fi
+
+    #client_ext_ip="123.58.254.17"
+    echo ""
+    printf "Please input \33[;31mVPN Client's Extnnal Network's IP:\33[0m (default is: \33[;31m"${client_ext_ip}"\33[0m):"
+    read -t 60 client_ext_ip_input
+    if [ "$client_ext_ip_input" != "" ]
+    then
+    client_ext_ip=${client_ext_ip_input}
+    fi
+
+    #client_ext_ssh_port="22"
+    echo ""
+    printf "Please input \33[;31mVPN Client's Extnnal Network's IP's Port:\33[0m (default is: \33[;31m"${client_ext_ssh_port}"\33[0m):"
+    read -t 60 client_ext_ssh_port_input
+    if [ "$client_ext_ssh_port_input" != "" ]
+    then
+    client_ext_ssh_port=${client_ext_ssh_port_input}
+    fi
+
+    #client_host_user="root"
+    echo ""
+    printf "Please input \33[;31mVPN Client's host's Username:\33[0m (default is: \33[;31m"${client_host_user}"\33[0m):"
+    read -t 60 client_host_user_input
+    if [ "$client_host_user_input" != "" ]
+    then
+    client_host_user=${client_host_user_input}
+    fi
+
+    #client_host_user_password="12345678Cm"
+    echo ""
+    printf "Please input \33[;31mVPN Client's host's Username's Password:\33[0m (default is: \33[;31m"${client_host_user_password}"\33[0m):"
+    read -t 60 client_host_user_password_input
+    if [ "$client_host_user_password_input" != "" ]
+    then
+    client_host_user_password=${client_host_user_password_input}
+    fi
+
+    #vpn_user_client=client1
+    echo ""
+    printf "Please input \33[;31mVPN Client's Username:\33[0m (default is: \33[;31m"${vpn_user_client}"\33[0m):"
+    read -t 60 vpn_user_client_input
+    if [ "$vpn_user_client_input" != "" ]
+    then
+    vpn_user_client=${vpn_user_client_input}
+    fi
+}
+
+
+
+################
+
+install_rpms()
+{
+    is_yum=0
+    counter=0
+
+    while [ "${is_yum}" == "0" ] && [ "${counter}" != "5" ]
+    do
+        rpm -q epel-release
+        if [ "$?" == "0" ];then
+            is_yum=1
+            continue
+            echo -e "\n\033[32mepel-release-6-8.noarch has been installed already!\033[0m\n"
+        else
+            yum install -y ${http_mirrors_epel}
+            if [ "$?" == "0" ];then
+                is_yum=1
+                echo -e "\n\033[32mInstall epel-release-6-8.noarch Successful!\033[0m\n"
+            else
+                let counter+=1
+            fi
+            
+        fi
+    done
+
+    os_version=$(cat /etc/redhat-release|cut -d "e" -f 5|cut -d " " -f 2)
+    if [ "${os_version}" == "6.2" ];then
+        echo -e "\n\033[32mThis system is 6.2, must modify repos!\033[0m\n"
+        sed -i "s/^#baseurl=/baseurl=/g" /etc/yum.repos.d/epel.repo
+        sed -i "s/^mirrorlist=/#mirrorlist=/g" /etc/yum.repos.d/epel.repo
+    fi
+
+
+    is_yum=0
+    counter=0
+
+    while [ "${is_yum}" == "0" ] && [ "${counter}" != "5" ]
+    do
+        rpms="openvpn easy-rsa sshpass expect ntp initscripts"
+        yum clean all
+        yum install -y ${rpms}
+        is_yum=1
+        let counter+=1
+
+        for i in ${rpms}
+        do
+            rpm -q $i
+            if [ "$?" == "0" ];then
+                echo -e "\n\033[32m$i has installed already!\033[0m\n"
+            else
+                echo -e "\n\033[32m$i is not installed yet!\033[0m\n"
+                is_yum=0
+                break
+            fi
+        done
+    done
+
+
+    if [ "${counter}" == "5" ];then
+        echo -e "\n\033[32mInstall RPMs error, Please check your Extnnal\047s network!\033[0m\n"
+        exit 1
+    else
+        echo -e "\n\033[32mInstall RPMs Successful!\033[0m\n"
+    fi
+
+
+    `which cp` -rf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+    ntpdate 1.pool.ntp.org
+
+    /sbin/service iptables status 1>/dev/null 2>&1
+    if [ "$?" == "0" ];then
+        /sbin/iptables -I INPUT -p udp --dport 1194 -j ACCEPT
+        /etc/rc.d/init.d/iptables save
+        /etc/init.d/iptables restart
+    fi
+
+    mkdir -p ${keys_path}
+    cp -rf /usr/share/easy-rsa/2.0/* ${easy_rsa_path}
+    cp ${easy_rsa_path}/openssl-1.0.0.cnf ${easy_rsa_path}/openssl.cnf
+
+    cd ${easy_rsa_path}
+    source ${easy_rsa_path}/vars
+    sh ${easy_rsa_path}/clean-all
+}
+
+
+
+################
+
+openvpn_install_expect_echo()
+{
+openvpn_install_expect='#!/usr/bin/expect -f
+if $argc<2 {
+        puts stderr "Usage: $argv0 need argv.\n"
+        exit 1
+}
+set cmds_path [lindex $argv 0]
+set cmds_build [lindex $argv 1]
+set vpn_user [lindex $argv 2]
+
+spawn ${cmds_path}/${cmds_build} ${vpn_user}
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "\r"
+expect "*"
+send "y\r"
+expect "*"
+send "y\r"
+expect eof
+exit'
+
+echo "${openvpn_install_expect}" > ${pwds}/openvpn_install.expect
+chmod +x ${pwds}/openvpn_install.expect
+}
+
+
+
+################
+
+add_user()
+{
+    openvpn_version=`rpm -q openvpn|cut -d '-' -f 2`
+    cd ${easy_rsa_path}
+    source ${easy_rsa_path}/vars
+
+    if [ "$1" == "build-ca" ]; then
+        cmds="build-ca"
+        username=""
+        ${pwds}/openvpn_install.expect ${easy_rsa_path} $cmds $username
+    elif [ "$1" == "server" ]; then
+        cmds="build-key-server"
+        username="$1"
+        ${pwds}/openvpn_install.expect ${easy_rsa_path} $cmds $username
+        sh ${easy_rsa_path}/build-dh
+        cp ${keys_path}/{ca.crt,ca.key,server.crt,server.key,dh*.pem} ${config_path}
+        cp /usr/share/doc/openvpn-${openvpn_version}/sample/sample-config-files/server.conf ${config_path}
+        service openvpn start
+        chkconfig openvpn on
+    else
+        cmds="build-key"
+        username="$1"
+        if [ -f ${keys_path}/$username.crt ];then
+            echo -e "\n\033[32m$username exsit, exit!\033[0m\n"
+            break
+        else
+            ${pwds}/openvpn_install.expect ${easy_rsa_path} $cmds $username
+            cd ${keys_path}
+            mkdir -p ${keys_path}/$username
+            cp /usr/share/doc/openvpn-${openvpn_version}/sample/sample-config-files/client.conf ${keys_path}/$username
+            sed -i "s/my-server-1/${server_ext_ip}/g" ${keys_path}/$username/client.conf
+            sed -i "s/client.crt/${username}.crt/g" ${keys_path}/$username/client.conf
+            sed -i "s/client.key/${username}.key/g" ${keys_path}/$username/client.conf
+            cp ${keys_path}/{${username}.crt,${username}.key,ca.crt} ${keys_path}/$username
+            tar zcvf $username.tar.gz $username
+            cd ${pwds}
+            echo -e "\n\033[32mAdd ${username} Successful\033[0m\n"
+        fi
+    fi
+    cd ${pwds}
+}
+
+
+
+################
+
+set_point_to_site()
+{
+    /sbin/service iptables status 1>/dev/null 2>&1
+    if [ "$?" != "0" ];then
+        /sbin/iptables -I INPUT -p udp --dport 1194 -j ACCEPT
+    fi
+    /sbin/iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+    /etc/rc.d/init.d/iptables save
+    /etc/init.d/iptables restart
+
+    sed -i 's/net.ipv4.ip_forward =.*/net.ipv4.ip_forward = 1/g' /etc/sysctl.conf
+    sysctl -p
+
+    ip=`ifconfig eth0|grep 'inet addr:'|cut -d ':' -f 2|cut -d ' ' -f 1`
+    netmask=`ifconfig eth0|grep 'inet addr:'|cut -d ':' -f 4`
+    network_id=`ipcalc -n "$ip" "$netmask"|cut -d '=' -f 2`
+    sed -i "/192.168.20.0/a\push \"route $network_id $netmask\"" /etc/openvpn/server.conf
+    service openvpn restart
+}
+
+
+
+################
+
+del_user()
+{
+    cd /etc/openvpn/easy-rsa
+    source /etc/openvpn/easy-rsa/vars
+    /etc/openvpn/easy-rsa/revoke-full $1
+    rm -rf /etc/openvpn/easy-rsa/keys/$1.*
+    cp -rf /etc/openvpn/easy-rsa/keys/crl.pem /etc/openvpn
+    echo "crl-verify /etc/openvpn/crl.pem" >> /etc/openvpn/server.conf
+    service openvpn restart
+    cd ${pwds}
+    echo -e "\n\033[32mDelete $1 Successful!\033[0m\n" 
+}
+
+
+
+################
+
+install_client()
+{
+    which scp || yum -y install openssh-clients
+
+    openvpn_install_client='#!/bin/bash
+
+
+
+is_yum=0
+counter=0
+
+while [ "${is_yum}" == "0" ] && [ "${counter}" != "5" ]
+do
+    rpm -q epel-release
+    if [ "$?" == "0" ];then
+        is_yum=1
+        continue
+        echo -e "\n\033[32mepel-release-6-8.noarch has been installed already!\033[0m\n"
+    else
+        yum install -y ${http_mirrors_epel}
+        if [ "$?" == "0" ];then
+            is_yum=1
+            echo -e "\n\033[32mInstall epel-release-6-8.noarch Successful!\033[0m\n"
+        else
+            let counter+=1
+        fi
+    
+    fi
+done
+
+os_version=$(cat /etc/redhat-release|cut -d "e" -f 5|cut -d " " -f 2)
+if [ "${os_version}" == "6.2" ];then
+    echo -e "\n\033[32mThis system is 6.2, must modify repos!\033[0m\n"
+    sed -i "s/^#baseurl=/baseurl=/g" /etc/yum.repos.d/epel.repo
+    sed -i "s/^mirrorlist=/#mirrorlist=/g" /etc/yum.repos.d/epel.repo
+fi
+
+
+is_yum=0
+counter=0
+
+while [ "${is_yum}" == "0" ] && [ "${counter}" != "5" ]
+do
+    rpms="openvpn ntp"
+    yum clean all
+    yum install -y ${rpms}
+    is_yum=1
+    let counter+=1
+
+    for i in ${rpms}
+    do
+        rpm -q $i
+        if [ "$?" == "0" ];then
+            echo -e "\n\033[32m$i has installed!\033[0m\n"
+        else
+            echo -e "\n\033[32m$i is not installed yet!\033[0m\n"
+            is_yum=0
+            break
+        fi
+    done
+done
+
+
+if [ "${counter}" == "5" ];then
+    echo -e "\n\033[32mInstall RPMs error, Please check your Extenal\047s network!\033[0m\n"
+    exit 1
+else
+    echo -e "\n\033[32mInstall RPMs Successful!\033[0m\n"
+fi
+
+`which cp` -rf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+ntpdate 1.pool.ntp.org'
+
+
+    echo "${openvpn_install_client}" > ${pwds}/openvpn_install_client.sh
+    sed -i "s@\${http_mirrors_epel}@${http_mirrors_epel}@g" ${pwds}/openvpn_install_client.sh
+
+    sshpass -p ${client_host_user_password} ssh -o StrictHostKeyChecking=no -p ${client_ext_ssh_port} ${client_ext_ip} \
+    "
+        os_arch=$(uname -m)
+        if [ "${os_arch}" != "x86_64" ]; then echo -e "\n\033[32mThis script must run on x86_64 Arch!\033[0m\n";exit 2;fi
+        rpm -q wget || yum install -y wget
+        which scp || yum -y install openssh-clients
+    "
+
+    sshpass -p ${client_host_user_password} scp -o StrictHostKeyChecking=no -P ${client_ext_ssh_port} \
+    ${pwds}/openvpn_install_client.sh ${client_host_user}@${client_ext_ip}:/tmp
+
+    sshpass -p ${client_host_user_password} ssh -o StrictHostKeyChecking=no -p ${client_ext_ssh_port} ${client_ext_ip} \
+    "
+        sh /tmp/openvpn_install_client.sh
+        rm -rf /tmp/openvpn_install_client.sh
+    "
+
+    sshpass -p ${client_host_user_password} scp -o StrictHostKeyChecking=no -P ${client_ext_ssh_port} \
+    ${keys_path}/${vpn_user_client}/{ca.crt,${vpn_user_client}.crt,${vpn_user_client}.key,client.conf} ${client_host_user}@${client_ext_ip}:${config_path}
+
+    currentDay=`date "+%Y%m%d"`
+    currentTime=`date --date='3 second' "+%H:%M:%S"`
+
+    sshpass -p ${client_host_user_password} ssh -o StrictHostKeyChecking=no -p ${client_ext_ssh_port} ${client_ext_ip} \
+    "date -s ${currentDay};date -s ${currentTime}"
+    sshpass -p ${client_host_user_password} ssh -o StrictHostKeyChecking=no -p ${client_ext_ssh_port} ${client_ext_ip} \
+    "service openvpn restart;chkconfig openvpn on"
+}
+
+
+
+################
+
+if [ ${install_switch} == 0 ] || [ ${openvpn_install_expect_echo_switch} == 0 ]; then
+    openvpn_install_expect_echo
+fi
+
+if [ ${install_switch} == 0 ] || [ ${get_info_form_user_switch} == 0 ]; then
+    get_info_form_user
+fi
+
+if [ ${install_switch} == 0 ] || [ ${install_rpms_switch} == 0 ]; then
+    install_rpms
+fi
+
+if [ ${install_switch} == 0 ] || [ ${add_user_server_switch} == 0 ]; then
+    add_user build-ca
+    add_user server
+    sed -i 's/install_switch=0/install_switch=1/' ${pwds}/openvpn_install.sh
+fi
+
+
+if [ ${install_switch} == 0 ] || [ ${set_point_to_site_switch} == 0 ]; then
+    set_point_to_site
+fi
+
+
+if [ ${install_switch} == 1 ]; then
+    echo -e "\n\033[32mVPN Server has installed, and the ${vpn_user_client} may be exsit, Please input another Client\047s Username for Create it!\033[0m\n"
+    get_info_form_user
+fi
+
+
+for i in ${vpn_user_client}
+do
+    add_user ${vpn_user_client}
+    #del_user ${vpn_user_client}
+done
+
+if [ ${install_switch} == 0 ] || [ ${install_client_switch} == 0 ]; then
+    install_client
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cp /usr/share/doc/openvpn-2.3.11/sample/sample-config-files/server.conf /etc/openvpn/
+
+cp /usr/share/doc/openvpn-2.3.11/sample/sample-config-files/client.conf /root
+
+sshpass -p 12345678Cm scp -P 22  -o StrictHostKeyChecking=no /root/client.conf root@123.58.254.12:/etc/openvpn
+
+
+
+
+
+
+iptables -t nat -A POSTROUTING -s 10.8.0.0/255.255.0.0 -j SNAT --to-source 10.1.0.12
+
+
+
+openvpn 连不上经常是因为时间不同步
+
+
+
+
+
+
+
+
+
+用户名  密码
+
+cat > $(/etc/openvpn/easy-rsa)/users.txt <<eof
+chenhuaming  uni-orange-chm
+chenyanzhuo  uni-orange-cyz
+kuanghongyin  uni-orange-khy
+linyunzhu  uni-orange-lyz
+liufutao  uni-orange-lft
+panjiadong  uni-orange-pjd
+liujun  uni-orange
+eof
+
+
+
+
+
+
+
+vi cp_users_config.sh
+
+
+
+#!/bin/bash
+
+
+yum install -y gcc openssl-devel lzo-devel pam-devel
+
+
+users="chenhuaming chenyanzhuo kuanghongyin linyunzhu liufutao panjiadong liujun"
+
+for i in ${users};
+do
+  mkdir ${keys_path}/config-$i;
+  cp ${keys_path}/$i.{crt,key} ${keys_path}/config-$i;
+  cp ${keys_path}/ca.crt ${keys_path}/config-$i;
+  cp ${keys_path}/client.conf ${keys_path}/config-$i;
+  sed -i "s/client.crt/$i.crt/" ${keys_path}/config-$i/client.conf
+  sed -i "s/client.key/$i.key/" ${keys_path}/config-$i/client.conf
+done
+
+
+
+
+
+cat > $(/etc/openvpn/easy-rsa)/users.txt <<eof
+chenhuaming  uni-orange-chm
+chenyanzhuo  uni-orange-cyz
+kuanghongyin  uni-orange-khy
+linyunzhu  uni-orange-lyz
+liufutao  uni-orange-lft
+panjiadong  uni-orange-pjd
+liujun  uni-orange
+eof
+
+
+
+for i in `awk '{print $1}' $(/etc/openvpn/easy-rsa)/users.txt`
+do
+
+j=`awk -v I="$i" '{if(I==$1)print $2}' $(/etc/openvpn/easy-rsa)/users.txt`
+
+expect /root/shell/login.exp $i $j
+
+done
+
+
+

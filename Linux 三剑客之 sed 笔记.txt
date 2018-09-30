@@ -1,0 +1,270 @@
+
+
+
+
+
+
+
+
+
+
+
+
+sed是一个很好的文件处理工具，本身是一个管道命令，主要是以行为单位进行处理，可以将数据行进行替换、删除、新增、选取等特定工作，下面先了解一下sed的常见用法。
+
+
+基础语法：
+
+sed [-nefri] ‘command(s)’ 输入文本
+
+常用选项：
+ -n ∶ 使用安静(silent)模式。在一般 sed 的用法中，所有来自 STDIN的资料一般都会被列出到萤幕上。但如果加上 -n 参数后，则只有经过sed 特殊处理的那一行(或者动作)才会被列出来。
+ -e ∶ 直接在指令列模式上进行 sed 的动作编辑；
+ -f ∶ 直接将 sed 的动作写在一个档案内， -f filename 则可以执行 filename 内的sed 动作；
+ -r ∶ sed 的动作支援的是延伸型正规表示法的语法。(预设是基础正规表示法语法)
+ -i ∶ 直接修改读取的档案内容，而不是由萤幕输出。
+
+常用命令：
+a  ∶新增， a 的后面可以接字串，而这些字串会在新的一行出现(目前的下一行)～
+c  ∶取代， c 的后面可以接字串，这些字串可以取代 n1,n2 之间的行！
+d  ∶删除，因为是删除啊，所以 d 后面通常不接任何咚咚；
+i  ∶插入， i 的后面可以接字串，而这些字串会在新的一行出现(目前的上一行)；
+p  ∶列印，亦即将某个选择的资料印出。通常 p 会与参数 sed -n 一起运作～
+s  ∶取代，可以直接进行取代的工作哩！通常这个 s 的动作可以搭配正规表示法！例如 1,20s/old/new/g 就是啦！
+
+
+
+删除命令 d
+
+
+cat books.txt
+1) A Storm of Swords, George R. R. Martin, 1216 
+2) The Two Towers, J. R. R. Tolkien, 352 
+3) The Alchemist, Paulo Coelho, 197 
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+5) The Pilgrimage, Paulo Coelho, 288 
+6) A Game of Thrones, George R. R. Martin, 864
+
+#删除第1行
+sed '1d' books.txt 
+2) The Two Towers, J. R. R. Tolkien, 352 
+3) The Alchemist, Paulo Coelho, 197 
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+5) The Pilgrimage, Paulo Coelho, 288 
+6) A Game of Thrones, George R. R. Martin, 864
+
+#删除最后1行
+sed '$d' books.txt 
+1) A Storm of Swords, George R. R. Martin, 1216 
+2) The Two Towers, J. R. R. Tolkien, 352 
+3) The Alchemist, Paulo Coelho, 197 
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+5) The Pilgrimage, Paulo Coelho, 288 
+
+#删除第2行到第4行
+sed '2,4d' books.txt 
+1) A Storm of Swords, George R. R. Martin, 1216 
+5) The Pilgrimage, Paulo Coelho, 288 
+6) A Game of Thrones, George R. R. Martin, 864
+
+#删除第3行到最后1行
+sed '3,$d' books.txt 
+1) A Storm of Swords, George R. R. Martin, 1216 
+2) The Two Towers, J. R. R. Tolkien, 352
+
+
+       
+
+显示命令 p
+
+
+#显示第1行
+sed -n '1p' books.txt
+1) A Storm of Swords, George R. R. Martin, 1216 
+
+#显示最后1行
+sed -n '$p' books.txt
+6) A Game of Thrones, George R. R. Martin, 864
+
+#显示第2行到第4行
+sed -n '2,4p' books.txt
+2) The Two Towers, J. R. R. Tolkien, 352 
+3) The Alchemist, Paulo Coelho, 197 
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+
+#显示第3行到最后1行
+sed -n '3,$p' books.txt 
+3) The Alchemist, Paulo Coelho, 197 
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+5) The Pilgrimage, Paulo Coelho, 288 
+6) A Game of Thrones, George R. R. Martin, 864
+
+
+
+使用模式进行查询
+
+#查询包括关键字ruby所在所有行
+sed -n '/Martin/ p' books.txt
+1) A Storm of Swords, George R. R. Martin, 1216 
+6) A Game of Thrones, George R. R. Martin, 864
+
+
+
+追加命令 a
+
+
+在第4行之后追加1本新书
+
+sed '4 a 7) Adultry, Paulo Coelho, 234' books.txt
+1) A Storm of Swords, George R. R. Martin, 1216 
+2) The Two Towers, J. R. R. Tolkien, 352 
+3) The Alchemist, Paulo Coelho, 197 
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+7) Adultry, Paulo Coelho, 234
+5) The Pilgrimage, Paulo Coelho, 288 
+6) A Game of Thrones, George R. R. Martin, 864
+
+除了行号，我们也可以使用文本模式指定地址，例如，在匹配 The Alchemist 的行之后追加文本
+
+sed '/The Alchemist/ a 7) Adultry, Paulo Coelho, 234' books.txt
+1) A Storm of Swords, George R. R. Martin, 1216 
+2) The Two Towers, J. R. R. Tolkien, 352 
+3) The Alchemist, Paulo Coelho, 197 
+7) Adultry, Paulo Coelho, 234
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+5) The Pilgrimage, Paulo Coelho, 288 
+6) A Game of Thrones, George R. R. Martin, 864
+
+在文件的结尾插入一行文本，使用 $ 作为地址
+
+sed '$ a 7) Adultry, Paulo Coelho, 234' books.txt
+1) A Storm of Swords, George R. R. Martin, 1216 
+2) The Two Towers, J. R. R. Tolkien, 352 
+3) The Alchemist, Paulo Coelho, 197 
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+5) The Pilgrimage, Paulo Coelho, 288 
+6) A Game of Thrones, George R. R. Martin, 864
+7) Adultry, Paulo Coelho, 234
+
+
+
+替换命令 s
+
+
+这个功能是我们常用的，用法如下：
+
+sed 's/要被取代的字串/新的字串/g' file
+
+在前面我们使用的books.txt文件中，我们使用逗号“,”分隔每一列，下面的示例中，我们会使用替换命令将其替换为管道符“|”：
+
+sed 's/,/ |/' books.txt
+1) A Storm of Swords | George R. R. Martin, 1216 
+2) The Two Towers | J. R. R. Tolkien, 352 
+3) The Alchemist | Paulo Coelho, 197 
+4) The Fellowship of the Ring | J. R. R. Tolkien, 432 
+5) The Pilgrimage | Paulo Coelho, 288 
+6) A Game of Thrones | George R. R. Martin, 864
+
+是不是觉得哪里不对？相信你已经发现，每一行的第二个逗号都没有被替换，只有第一个被替换了，确实如此，在SED中，使用替换命令的时候默认只会对第一个匹配的位置进行替换。使用g选项告诉SED对所有内容进行替换：
+
+sed 's/,/ |/g' books.txt
+1) A Storm of Swords | George R. R. Martin | 1216 
+2) The Two Towers | J. R. R. Tolkien | 352 
+3) The Alchemist | Paulo Coelho | 197 
+4) The Fellowship of the Ring | J. R. R. Tolkien | 432 
+5) The Pilgrimage | Paulo Coelho | 288 
+6) A Game of Thrones | George R. R. Martin | 864
+
+在执行替换操作的时候，如果要替换的内容中包含/，这个时候怎么办？很简单，添加转义操作符：
+
+sed 's/\/bin\/sed/\/home\/duoyi/'
+/home/duoyi
+
+上面的命令中，我们使用\对/进行了转义，不过表达式已经看起来非常难看了，在SED中还可以使用|，@，^，!作为命令的分隔符，所以，下面的几个命令和上面的是等价的
+
+echo "/bin/sed" | sed 's@/bin/sed@/home/duoyi@'
+echo "/bin/sed" | sed 's#/bin/sed#/home/duoyi#'
+
+
+
+
+多点编辑 e
+
+
+一条sed命令，删除/etc/passwd第三行到末尾的数据，并把bash替换为blueshell
+nl /etc/passwd | sed -e '3,$d' -e 's/bash/blueshell/'
+1  root:x:0:0:root:/root:/bin/blueshell
+2  daemon:x:1:1:daemon:/usr/sbin:/bin/sh
+
+
+
+直接修改文件内容 i
+以上的例子都没有修改原文件。sed 可以直接修改文件的内容，不必使用管道命令或数据流重导向！ 将 books.txt copy 一份，我们在副本上来演示：
+
+cp books.txt books3.txt
+
+修改前，先来比较一下，是一模一样的：
+
+diff books.txt books3.txt
+
+下面，把作者 Paulo Coelho 替换成 大写，先不加 -i ：
+
+sed 's/Paulo Coelho/PAULO COELHO/g' books.txt 
+1) A Storm of Swords, George R. R. Martin, 1216 
+2) The Two Towers, J. R. R. Tolkien, 352 
+3) The Alchemist, PAULO COELHO, 197 
+4) The Fellowship of the Ring, J. R. R. Tolkien, 432 
+5) The Pilgrimage, PAULO COELHO, 288 
+6) A Game of Thrones, George R. R. Martin, 864
+
+对比一下，发现原文件没有被修改。
+
+现在，加上 -i ：
+
+sed -i 's/Paulo Coelho/PAULO COELHO/g' books.txt
+
+再对比一下，发现原文件的3,5 行都被修改了：
+
+diff books.txt books3.txt 
+3c3
+< 3) The Alchemist, PAULO COELHO, 197 
+---
+> 3) The Alchemist, Paulo Coelho, 197 
+5c5
+< 5) The Pilgrimage, PAULO COELHO, 288 
+---
+> 5) The Pilgrimage, Paulo Coelho, 288
+
+
+
+下面，再来演示一个sed的常见的应用
+
+
+先观察原始信息，利用 /sbin/ifconfig 查询 IP
+
+/sbin/ifconfig eth0
+eth0      Link encap:Ethernet  HWaddr FA:16:3E:B3:A7:9F  
+          inet addr:10.1.0.55  Bcast:10.1.255.255  Mask:255.255.0.0
+          inet6 addr: fe80::f816:3eff:feb3:a79f/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+.....(以下省略).....
+
+本机的ip是 10.1.0.55 。
+
+先将 IP 前面的部分删除
+
+/sbin/ifconfig eth0 | grep 'inet addr' | sed 's/^.*addr://g'
+10.1.0.55  Bcast:10.1.255.255  Mask:255.255.0.0
+
+接下来则是删除后面的部分，  Bcast:10.1.255.255  Mask:255.255.0.0
+
+/sbin/ifconfig eth0 | grep 'inet addr' | sed 's/^.*addr://g' | sed 's/Bcast.*$//g'
+10.1.0.55
+
+
+
+
+
+
+http://blog.jobbole.com/109088/
+http://www.runoob.com/linux/linux-comm-sed.html

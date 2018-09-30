@@ -1,0 +1,473 @@
+
+
+echo "1:2:3" | awk -F: '{print $1 " and " $2 " and " $3}'
+
+echo "1:2:3"|awk -F: '{print $1,$3}'
+
+
+echo | awk -v a=1 'BEGIN {print a}'
+
+
+cat a
+file a
+
+cat b 
+file b
+
+
+awk 'BEGIN {print "BEGIN: " var} {print "PROCESS: " var} END {print "END: " var}' var=1 a
+BEGIN: 
+PROCESS: 1
+END: 1
+
+awk 'BEGIN {print "BEGIN: " var} {print "PROCESS: " var} END {print "END: " var}' a var=1
+BEGIN: 
+PROCESS: 
+END: 1
+
+awk 'BEGIN {print "BEGIN: " var} {print "PROCESS: " var} END {print "END: " var}' a var=1 b
+BEGIN: 
+PROCESS: 
+PROCESS: 1
+END: 1
+
+1. 如果变量赋值在第一个文件参数之前，在BEGIN动作之后执行，影响到正常处理和END动作；
+
+2. 如果变量赋值在最后一个文件参数之后，在END动作之前执行，仅影响END动作；
+
+3. 如果文件参数不存在，情况同1所述；
+
+4. 如果变量赋值位于多个文件参数之间，在变量赋值前面的文件被处理后执行，影响到后续文件的处理和END动作；
+
+所以变量赋值一定要考虑清楚用途，否则比较容易出错，不过一般情况下也不会用到变量赋值。
+
+自然地大家会将变量赋值与-v assignment选项进行比较，赋值的形式是一致的，但是-v选项的执行时机比变量赋值要早：
+
+echo 1|awk -v var=a 'BEGIN {print "BEGIN: " var}'
+BEGIN: a
+
+可见，-v选项的赋值操作在BEGIN动作之前就执行了。
+
+
+echo 1 | awk -v BEGIN=1 'BEGIN {print "BEGIN: " BEGIN}'
+awk: BEGIN {print "BEGIN: " BEGIN}
+awk:                        ^ syntax error
+与关键字重名
+
+
+记录（Record）与字段（Field)
+
+对于数据库来说，一个数据库表是由多条记录组成的，每一行表示一条记录（Record）。每条记录由多列组成，每一列表示一个字段（Field)。Awk将一个文本文件视为一个文本数据库，因此它也有记录和字段的概念。默认情况下，记录的分隔符是回车，字段的分隔符是空白符，所以文本文件的每一行表示一个记录，而每一行中的内容被空白分隔成多个字段。利用字段和记录，awk就可以非常灵活地处理文件的内容。
+
+可以通过-F选项来修改默认的字段分隔符，例如/etc/passwd的每一行都是由冒号分隔成多个字段的，所以这里就需要将分隔符设置成冒号：
+
+awk -F: '{print $1}' /etc/passwd|head -3
+
+这里通过$1引用第一人字段，类似地$2表示第二个字段，$3表示第三个字段…. $0则表示整个记录。内置变量NF记录着字段的个数，所以$NF表示最后一个字段：
+
+awk -F: '{print $NF}' /etc/passwd
+
+
+
+内置变量FS也可以用于更改字段分隔符，它记录着当前的字段分隔符：
+
+awk -F: '{print FS}' /etc/passwd | head -1
+:
+
+awk -v FS=: '{print $1}' /etc/passwd | head -1
+root
+
+记录的分隔符可以通过内置变量RS更改：
+
+awk -v RS=: '{print $0}' /etc/passwd | head -1
+root
+
+
+
+
+
+
+
+脚本（Script）组成
+
+命令行中的program部分，可以称为awk代码,也可以称为awk脚本。一段awk脚本是由多个’pattern { action }‘序列组成的。action是一个或者多个语句，它在输入行匹配pattern的时候被执行。如果pattern为空，表明这个action会在每一行处理时都会被执行。下面的例子简单地打印文件的每一行，这里不带任何参数的print语句打印的是整个记录，类似’print $0‘：
+
+echo -e "line1\nline2"| awk '{print}'
+line1
+line2
+
+
+除了pattern { action }，还可以在脚本中定义自定义的函数，函数定义格式如下所示：
+
+function name(parameter list) { statements }
+
+函数的参数列表用逗号分隔，参数默认是局部变量，无法在函数之外访问，而在函数中定义的变量为全局变量，可以在函数之外访问，如：
+
+echo line2 | awk 'function t(a) {b=a;print a;} {print b; t("me"); print b;}'
+
+me
+me
+
+
+\
+
+cat test.awk 
+function t(a)
+{
+    b=a
+    print "This is a very long line, so use backslash to escape the newline \
+then we will print the variable a: a=" a
+} 
+ 
+{ print b; t("duoyi.me"); print b;
+
+
+
+echo 1 | awk -f test.awk 
+
+This is a very long line, so use backslash to escape the newline then we will print the variable a: a=duoyi.me
+duoyi.me
+
+
+
+
+
+模式（Pattern）
+
+模式是awk中比较重要的一部分，它有以下几种情况：
+
+● /regular expression/： 扩展的正则表达式（Extended Regular Expression）， 关于ERE可以参考这篇文章；
+
+● relational expression： 关系表达式，例如大于、小于、等于，关系表达式结果为true表示匹配；
+
+● BEGIN： 特殊的模式，在第一个记录处理之前被执行，常用于初始化语句的执行；
+
+● END： 特殊的模式，在最后一个记录处理之前被执行，常用于输出汇总信息；
+
+● pattern, pattern：模式对，匹配两者之间的所有记录，类似sed的地址对；
+
+例如查找匹配数字3的行：
+
+seq 1 20 | awk '/3/ {print}'
+3
+13
+
+
+! 则表示不匹配
+
+seq 1 5 | awk '!/3/ {print}'
+1
+2
+4
+5
+
+
+除了BEGIN和END这两个特殊的模式外，其余的模式都可以使用’&&’或者’||’运算符组合，前者表示逻辑与，后者表示逻辑或：
+
+seq 1 50 | awk '/1/ && /3/ {print}'
+13
+31
+
+
+seq 1 9 | awk 'NR==3 {print}'
+3
+
+
+
+
+数组是一种特殊的变量，在awk中，比较特殊地是，数组的下标可以为数字或者字符串。数组的赋值很简单，下面将value赋值给数组下标为index的元素：
+
+array[index]=value
+
+可以用for..in..语法遍历数组元素，其中item是数组元素对应的下标：
+for (item in array)
+
+当然也可以在if分支判断中使用in操作符：
+if (item in array)
+
+一个完整的例子如下所示：
+
+
+echo "1 2 3" | awk '{ for (i=0;i<NF;i++) a[i]=i;} END { print 3 in a;for (i in a) printf "%s: %s\n", i, a[i];}'
+0
+0: 0
+1: 1
+2: 2
+
+终于搞明白了，第一行的 0 是 print 3 in a 打印的，因为 3 不在 a 中。所以结果为假，也就是 0 。
+i 是 a 的下表，a[i] 则表示 a 的每个元素。以下两句不用记了。
+
+
+echo "1 2 3" | awk '{ for (i=0;i<NF;i++) a[i]=i*100;} END { print 3 in a;for (i in a) printf "%s: %s\n", i, a[i];}'
+
+echo "1 2 3" | awk '{ for (i=0;i<NF;i++) a[i]=i*100;} END { for (j in a) printf "%s: %s\n", j, a[j];}'
+
+
+
+
+
+内置变量
+
+Awk在内部维护了许多内置变量，或者称为系统变量，例如之前提到的FS、RS等等。常见的内置变量如下表所示
+
+变量名	描述
+ARGC	命令行参数的各个，即ARGV数组的长度
+ARGV	存放命令行参数
+CONVFMT	定义awk内部数值转换成字符串的格式，默认值为”%.6g”
+OFMT	定义输出时数值转换成字符串的格式，默认值为”%.6g”
+ENVIRON	存放系统环境变量的关联数组
+FILENAME	当前被处理的文件名
+NR	记录的总个数
+FNR	当前文件中的记录的总个数
+FS	字段分隔符，默认为空白
+NF	每个记录中字段的个数
+RS	记录的分隔符，默认为回车
+OFS	输出时字段的分隔符，默认为空白
+ORS	输出时记录的分隔符，默认为回车
+RLENGTH	被match函数匹配的子串长度
+RSTART	被match函数匹配的子串位于目标字符串的起始下标
+
+
+
+
+
+awk 'BEGIN { for (i = 0; i < ARGC; i++) print ARGV[i] }' INVENTORY-SHIPPED BBS-list
+awk
+INVENTORY-SHIPPED
+BBS-list
+
+
+awk 'BEGIN { for (i = 1; i < ARGC; i++) print ARGV[i] }' INVENTORY-SHIPPED BBS-list
+INVENTORY-SHIPPED
+BBS-list
+
+
+awk 'BEGIN {ARGV[1]="b"} {print}' a
+file b
+
+# 不明白
+awk 'BEGIN{ARGV[1]="var=1"} {print var}' a b
+1
+
+
+awk 'BEGIN{ARGV[1]=""} {print}' a b
+file b
+
+
+awk 'BEGIN{ARGV[1]="-"} {print}' a b
+a
+a    # --> 这里按下CTRL+D停止输入
+file b
+
+
+awk 'BEGIN{delete ARGV[1]} {print}' a b
+file b
+
+
+awk 'BEGIN{ARGC+=1;ARGV[1]="a"} {print}'
+file a
+
+
+awk 'BEGIN{printf "CONVFMT=%s,num=%f,str=%s\n", CONVFMT, 12.11, 12.11}'
+CONVFMT=%.6g,num=12.110000,str=12.11
+
+
+awk 'BEGIN{CONVFMT="%d"; printf "CONVFMT=%s,num=%f,str=%s\n", CONVFMT, 12.11, 12.11}'
+CONVFMT=%d,num=12.110000,str=12
+
+
+awk 'BEGIN{OFMT="%d";print 12.11}'
+12
+
+
+awk 'BEGIN { for (env in ENVIRON) printf "%s=%s\n", env, ENVIRON[env]}'
+
+
+awk 'BEGIN {match("hello,world", /llo/); print RLENGTH,RSTART}'
+3 3
+
+
+man awk | grep 'The operators in AWK' -A 42 -B 2 | sed 's/^ *//'
+
+
+echo 1 | awk '{printf("%s\n","abcd")}'
+abcd
+
+
+echo $'line1\nline2' | awk '{print;exit} END {print "exit..."}'
+line1
+exit...
+
+
+echo $'line1\nline2' | awk '{print;} END {print "exit..."}'
+line1
+line2
+exit...
+
+
+
+echo $'line1\nline2' | awk '{print "Before next.."; print $0; next; print "After next.."}'
+Before next..
+line1
+Before next..
+line2
+
+
+echo "1 2" | awk '{print $1, $2}'
+1 2
+
+
+echo "1 2" | awk '{print $1     $2}'
+12
+
+
+echo "1 2" | awk '{OFS="----";print $1,$2}'
+1----2
+
+
+
+
+cat column.txt
+statement|description
+delete|delete item from an array
+exit|exit from the awk process
+next|read next input record and process
+
+
+awk -F'|' '{print $1 > "statement.txt"; print $2 > "description.txt"}' column.txt 
+
+cat statement.txt 
+statement
+delete
+exit
+next
+
+cat description.txt 
+description
+delete item from an array
+exit from the awk process
+read next input record and process
+
+
+
+cat num.list 
+1
+3
+2
+9
+5
+
+awk '{print | "sort -n"}' num.list 
+1
+2
+3
+5
+9
+
+
+awk 'BEGIN {print rand(),rand();}'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+http://blog.jobbole.com/109089/
+
+
+
+
+
+
+
+cat marks.txt 
+1)  Amit    Physics  80
+2)  Rahul   Maths    90
+3)  Shyam   Biology  87
+4)  Kedar   English  85
+5)  Hari    History  89
+
+awk 'BEGIN{printf "Sr No\tName\tSub\tMarks\n"} {print}' marks.txt 
+Sr No	Name	Sub	Marks
+1)  Amit    Physics  80
+2)  Rahul   Maths    90
+3)  Shyam   Biology  87
+4)  Kedar   English  85
+5)  Hari    History  89
+
+
+awk '/a/ {++cnt} END {print "Count = ", cnt}' marks.txt 
+Count =  4
+
+
+
+
+
+awk 'length($0) > 18' marks.txt 
+1)  Amit    Physics  80
+2)  Rahul   Maths    90
+3)  Shyam   Biology  87
+4)  Kedar   English  85
+5)  Hari    History  89
+
+
+awk 'BEGIN{print "Arguments =",ARGC}' One Two Three Four
+Arguments = 5
+
+
+
+awk 'BEGIN{ print "Conversion Format =", CONVFMT }'
+Conversion Format = %.6g
+
+
+
+统计/etc/passwd的账户人数
+
+awk '{count++;print $0;} END{print "user count is ", count}' /etc/passwd
+
+awk 'BEGIN {count=0;print "[start]user count is ", count} {count=count+1;print $0;} END{print "[end]user count is ", count}' /etc/passwd
+[start]user count is  0
+root:x:0:0:root:/root:/bin/bash
+...
+[end]user count is  40
+
+
+
+统计某个文件夹下的文件占用的字节数
+
+ls -l |awk 'BEGIN {size=0;} {size=size+$5;} END{print "[end]size is ", size}'
+[end]size is  105609
+
+
+如果以M为单位显示:
+
+ls -l |awk 'BEGIN {size=0;} {size=size+$5;} END{print "[end]size is ", size/1024/1024,"M"}'
+[end]size is  0.100717 M
+
+
+统计某个文件夹下的文件占用的字节数,过滤4096大小的文件(一般都是文件夹):
+
+ls -l |awk 'BEGIN {size=0;print "[start]size is ", size} {if($5!=4096){size=size+$5;}} END{print "[end]size is ", size/1024/1024,"M"}'
+
+
+
+
+

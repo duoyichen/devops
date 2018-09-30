@@ -1,0 +1,296 @@
+#!/bin/bash
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+
+Function_Vhost()
+{
+    case "$1" in
+        [aA][dD][dD])
+            Add_VHost
+            ;;
+        [lL][iI][sS][tT])
+            List_VHost
+            ;;
+        [dD][eE][lL])
+            Del_VHost
+            ;;
+        [eE][xX][iI][tT])
+            exit 1
+            ;;
+        *)
+            echo "Usage: lnmp vhost {add|list|del}"
+            exit 1
+            ;;
+    esac
+}
+
+Add_VHost_Config()
+{
+    if [ ! -f /usr/local/nginx/conf/rewrite/${rewrite}.conf ]; then
+        echo "Create Virtul Host Rewrite file......"
+        touch /usr/local/nginx/conf/rewrite/${rewrite}.conf
+        echo "Create rewirte file successful,You can add rewrite rule into /usr/local/nginx/conf/rewrite/${rewrite}.conf."
+    else
+        echo "You select the exist rewrite rule:/usr/local/nginx/conf/rewrite/${rewrite}.conf"
+    fi
+
+    cat >"/usr/local/nginx/conf/vhost/${domain}.conf"<<EOF
+server
+    {
+        listen 80;
+        #listen [::]:80;
+        server_name ${domain} ${moredomain};
+        index index.html index.htm index.php default.html default.htm default.php;
+        root  ${vhostdir};
+
+        include rewrite/${rewrite}.conf;
+        #error_page   404   /404.html;
+
+        # Deny access to PHP files in specific directory
+        #location ~ /(wp-content|uploads|wp-includes|images)/.*\.php$ { deny all; }
+
+        ${include_enable_php}
+
+        location ~ .*\.(gif|jpg|jpeg|png|bmp|swf)$
+        {
+            expires      30d;
+        }
+
+        location ~ .*\.(js|css)?$
+        {
+            expires      12h;
+        }
+
+        location ~ /.well-known {
+            allow all;
+        }
+
+        location ~ /\.
+        {
+            deny all;
+        }
+
+        ${al}
+    }
+EOF
+
+    echo "Test Nginx configure file......"
+    /usr/local/nginx/sbin/nginx -t
+    echo "Reload Nginx......"
+    /usr/local/nginx/sbin/nginx -s reload
+}
+
+Add_VHost()
+{
+    domain=""
+    while :;do
+        Echo_Yellow "Please enter domain(example: www.lnmp.org): "
+        read domain
+        if [ "${domain}" != "" ]; then
+            if [ -f "/usr/local/nginx/conf/vhost/${domain}.conf" ]; then
+                Echo_Red " ${domain} is exist,please check!"
+                exit 1
+            else
+                echo " Your domain: ${domain}"
+            fi
+            break
+        else
+            Echo_Red "Domain name can't be empty!"
+        fi
+    done
+
+    Echo_Yellow "Enter more domain name(example: lnmp.org *.lnmp.org): "
+    read moredomain
+    if [ "${moredomain}" != "" ]; then
+        echo " domain list: ${moredomain}"
+    fi
+
+    vhostdir="/home/wwwroot/${domain}"
+    echo "Please enter the directory for the domain: $domain"
+    Echo_Yellow "Default directory: /home/wwwroot/${domain}: "
+    read vhostdir
+    if [ "${vhostdir}" == "" ]; then
+        vhostdir="/home/wwwroot/${domain}"
+    fi
+    echo "Virtual Host Directory: ${vhostdir}"
+
+    Echo_Yellow "Allow Rewrite rule? (y/n) "
+    read allow_rewrite
+    if [[ "${allow_rewrite}" == "n" || "${allow_rewrite}" == "" ]]; then
+        rewrite="none"
+    elif [ "${allow_rewrite}" == "y" ]; then
+        rewrite="other"
+        echo "Please enter the rewrite of programme, "
+        echo "wordpress,discuzx,typecho,thinkphp,laravel,codeigniter,yii2 rewrite was exist."
+        Echo_Yellow "(Default rewrite: other): "
+        read rewrite
+        if [ "${rewrite}" == "" ]; then
+            rewrite="other"
+        fi
+    fi
+    echo "You choose rewrite: ${rewrite}"
+
+    Echo_Yellow "Enable PHP Pathinfo? (y/n) "
+    read enable_pathinfo
+    if [[ "${enable_pathinfo}" == "n" || "${enable_pathinfo}" == "" ]]; then
+        echo "Disable pathinfo."
+        enable_pathinfo="n"
+    elif [ "${enable_pathinfo}" == "y" ]; then
+        echo "Enable pathinfo."
+        enable_pathinfo="y"
+    fi
+
+    Echo_Yellow "Allow access log? (y/n) "
+    read access_log
+    if [[ "${access_log}" == "n" || "${access_log}" == "" ]]; then
+        echo "Disable access log."
+        al="access_log off;"
+    else
+        Echo_Yellow "Enter access log filename(Default:${domain}.log): "
+        read al_name
+        if [ "${al_name}" == "" ]; then
+            al_name="${domain}"
+        fi
+        al="access_log  /home/wwwlogs/${al_name}.log;"
+        echo "You access log filename: ${al_name}.log"
+    fi
+
+    Multiple_PHP_Select
+
+    if [[ -s /usr/local/mysql/bin/mysql || -s /usr/local/mariadb/bin/mysql ]]; then
+        Echo_Yellow "Create database and MySQL user with same name (y/n) "
+        read create_database
+
+        if [ "${create_database}" == "y" ]; then
+            Verify_DB_Password
+            Add_Database_Menu
+        fi
+    fi
+
+    if [ -s /usr/local/pureftpd/sbin/pure-ftpd ]; then
+        Echo_Yellow "Create ftp account (y/n) "
+        read create_ftp
+
+        if [ "${create_ftp}" == "y" ]; then
+            Add_Ftp_Menu
+        fi
+    fi
+
+    Echo_Yellow "Add SSL Certificate (y/n) "
+    read create_ssl
+    if [ "${create_ssl}" == "y" ]; then
+        Add_SSL_Menu
+    fi
+
+    echo ""
+    echo "Press any key to start create virtul host..."
+    OLDCONFIG=`stty -g`
+    stty -icanon -echo min 1 time 0
+    dd count=1 2>/dev/null
+    stty ${OLDCONFIG}
+
+    echo "Create Virtul Host directory......"
+    mkdir -p ${vhostdir}
+    if [ "${access_log}" == "y" ]; then
+        touch /home/wwwlogs/${al_name}.log
+    fi
+    echo "set permissions of Virtual Host directory......"
+    chmod -R 755 ${vhostdir}
+    chown -R www:www ${vhostdir}
+
+    Add_VHost_Config
+
+    cat >${vhostdir}/.user.ini<<EOF
+open_basedir=${vhostdir}:/tmp/:/proc/
+EOF
+    chmod 644 ${vhostdir}/.user.ini
+    chattr +i ${vhostdir}/.user.ini
+
+    /etc/init.d/php-fpm restart
+
+    if [ "${create_database}" == "y" ]; then
+        Add_Database
+    fi
+
+    if [ "${create_ftp}" == "y" ]; then
+        Add_Ftp
+    fi
+
+    if [ "${create_ssl}" == "y" ]; then
+        Add_SSL
+    fi
+
+    Echo_Green "================================================"
+    echo "Virtualhost infomation:"
+    echo "Your domain: ${domain}"
+    echo "Home Directory: ${vhostdir}"
+    echo "Rewrite: ${rewrite}"
+    if [ "${access_log}" == "n" ]; then
+        echo "Enable log: no"
+    else
+        echo "Enable log: yes"
+    fi
+    if [ "${create_database}" == "y" ]; then
+        echo "Database username: ${database_name}"
+        echo "Database userpassword: ${mysql_password}"
+        echo "Database Name: ${database_name}"
+    else
+        echo "Create database: no"
+    fi
+    if [ "${create_ftp}" == "y" ]; then
+        echo "FTP account name: ${ftp_account_name}"
+        echo "FTP account password: ${ftp_account_password}"
+    else
+        echo "Create ftp account: no"
+    fi
+    if [ "${create_ssl}" == "y" ]; then
+        echo "Enable SSL: yes"
+        if [ "${ssl_choice}" == "1" ]; then
+            echo "  =>Certificate file"
+        elif [ "${ssl_choice}" == "2" ]; then
+            echo "  =>Let's Encrypt"
+        fi
+    fi
+    Echo_Green "================================================"
+}
+
+List_VHost()
+{
+    echo "Nginx Virtualhost list:"
+    ls /usr/local/nginx/conf/vhost/ | grep ".conf$" | sed 's/.conf//g'
+}
+
+Del_VHost()
+{
+    echo "======================================="
+    echo "Current Virtualhost:"
+    List_VHost
+    echo "======================================="
+    domain=""
+    while :;do
+        Echo_Yellow "Please enter domain you want to delete: "
+        read domain
+        if [ "${domain}" == "" ]; then
+            Echo_Red "Domain name can't be empty."
+        else
+            break
+        fi
+    done
+    if [ ! -f "/usr/local/nginx/conf/vhost/${domain}.conf" ]; then
+        echo "=========================================="
+        echo "Domain: ${domain} was not exist!"
+        echo "=========================================="
+        exit 1
+    else
+        if [ -f "${vhostdir}/.user.ini" ]; then
+            chattr -i "${vhostdir}/.user.ini"
+            rm -f "${vhostdir}/.user.ini"
+        fi
+        rm -f /usr/local/nginx/conf/vhost/${domain}.conf
+        echo "========================================================"
+        echo "Domain: ${domain} has been deleted."
+        echo "Website files will not be deleted for security reasons."
+        echo "You need to manually delete the website files."
+        echo "========================================================"
+    fi
+}

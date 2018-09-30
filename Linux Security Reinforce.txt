@@ -1,0 +1,547 @@
+
+
+
+
+要删除或者禁止登陆的用户
+
+
+vi safe_user_manager.sh
+i
+
+#!/bin/bash
+
+
+date=$(date "+%Y%m%d_%H%M%S")
+
+
+
+
+lock_user_list="lp
+sync
+shutdown
+halt
+news
+uucp
+operator
+games
+gopher
+xfs
+nscd
+dbus
+vcsa
+nobody
+avahi
+haldaemon
+ftp
+mailnull
+pcap
+mail
+adm"
+
+user_list=$(awk -F: '{print $1}' /etc/passwd)
+
+
+
+
+cp /etc/passwd /etc/passwd_bak$date
+
+for i in $lock_user_list
+do
+    is_exist=0
+    for j in $user_list
+    do
+        if [ $i == $j ];then
+            echo "will lock user $i"
+            #passwd -l $i
+            #echo "user $i has locked"
+            is_exist=1
+            break
+        fi
+    done
+    if [ $is_exist == 0 ];then
+        echo "System has no user $i"
+    fi
+done
+
+
+
+## useradd -o -u 0 rootkit for testing!
+
+user_id_0_list=$(awk -F: '{ if($3 == 0 && $1 != "root") print $1 }' /etc/passwd)
+user_nopass_list=$(awk -F: 'length($3) == 0 { print $1 }' /etc/passwd)
+
+
+for user_id_0 in $user_id_0_list
+do
+    printf "$user_id_0 has uid 0, Please input \33[;31my|Y\33[0m to delete! (default is not):"
+    read -t 10 delete_user_id_0
+    if [ "$delete_user_id_0" == "y" ] || [ "$delete_user_id_0" == "Y" ]
+    then
+        echo "Will delete user $user_id_0"
+        #userdel -r $user_id_0
+    fi
+done
+
+for user_nopass in $user_nopass_list
+do
+    printf "$user_nopass has uid 0, Please input \33[;31my|Y\33[0m to delete! (default is not):"
+    read -t 10 delete_user_nopass
+    if [ "$delete_user_nopass" == "y" ] || [ "$delete_user_nopass" == "Y" ]
+    then
+        echo "Will delete user $user_nopass"
+        #userdel -r $user_nopass
+    fi
+done
+
+
+
+cp /etc/pam.d/system-auth /etc/pam.d/system-auth_bak$date
+cp /etc/login.defs /etc/login.defs_bak$date
+cp /etc/pam.d/sshd /etc/pam.d/sshd_bak$date
+cp /etc/profile /etc/profile_bak$date
+
+
+
+
+#设置密码复杂度
+
+if [ -z `cat /etc/pam.d/system-auth_bak$date | grep -v "^#" | grep "pam_cracklib.so"` ];then
+    sed -i '/password    required      pam_deny.so/a\password    required      pam_cracklib.so retry=6 difok=5 try_first_pass minlen=8 ucredit=-1 lcredit=-1 ocredit=-1 dcredit=-1' /etc/pam.d/system-auth_bak$date
+fi
+
+
+#修改密码时效
+
+sed -i '/PASS_MAX_DAYS/s/99999/99999/' /etc/login.defs_bak$date
+sed -i '/PASS_MIN_DAYS/s/0/0/' /etc/login.defs_bak$date
+sed -i '/PASS_MIN_LEN/s/5/8/' /etc/login.defs_bak$date
+sed -i '/PASS_WARN_AGE/s/7/10/' /etc/login.defs_bak$date
+
+
+
+#设置连续登录失败暂锁机制
+
+
+if [ -z `cat /etc/pam.d/system-auth_bak$date | grep -v "^#" | grep "pam_tally.so"` ];then
+    if [ -z `cat /etc/pam.d/system-auth_bak$date | grep -v "^#" | grep "pam_tally.so" | grep auth` ];then
+        sed -i '/auth        required      pam_deny.so/a\auth        required      pam_tally.so deny=6 unlock_time=600 even_deny_root root_unlock_time=900' /etc/pam.d/system-auth_bak$date
+    fi
+    if [ -z `cat /etc/pam.d/system-auth_bak$date | grep -v "^#" | grep "pam_tally.so" | grep account` ];then
+        sed -i '/account     required      pam_permit.so/a\account     required      pam_tally.so' /etc/pam.d/system-auth_bak$date
+    fi
+fi
+
+
+if [ -z `cat /etc/pam.d/sshd_bak$date | grep -v "^#" | grep "pam_tally.so"` ];then
+    if [ -z `cat /etc/pam.d/sshd_bak$date | grep -v "^#" | grep "pam_tally.so" | grep auth` ];then
+        sed -i '/auth       include      postlogin/a\auth       required     pam_tally.so deny=6 unlock_time=600 even_deny_root root_unlock_time=900' /etc/pam.d/sshd_bak$date
+    fi
+    if [ -z `cat /etc/pam.d/sshd_bak$date | grep -v "^#" | grep "pam_tally.so" | grep account` ];then
+        sed -i '/account    include      password-auth/a\account    required    pam_tally.so' /etc/pam.d/sshd_bak$date
+    fi
+fi
+
+
+
+
+#检查密码重复使用次数
+
+if [ -z `cat /etc/pam.d/system-auth_bak$date | grep password | grep remember` ];then
+    sed -i '/password    sufficient    pam_unix.so/s/$/& remember=2/' /etc/pam.d/system-auth_bak$date
+fi
+
+
+# system timeout 10 minite auto logout
+
+if [ -z `cat /etc/profile_bak$date | grep -v "^#" | grep TMOUT` ];then
+    echo -e "\nexport TMOUT=1800" >> /etc/profile_bak$date
+fi
+
+
+# will system save history command list to 10
+sed -i "s/HISTSIZE=1000/HISTSIZE=10/" /etc/profile_bak$date
+
+# enable /etc/profile go!
+#source /etc/profile
+
+
+
+
+
+
+
+
+cp /etc/csh.cshrc /etc/csh.cshrc_bak$date
+cp /etc/bashrc /etc/bashrc_bak$date
+cp /etc/csh.login /etc/csh.login_bak$date
+
+
+#修改默认访问权限
+
+sed -i '/UMASK/s/077/027/' /etc/login.defs_bak$date
+
+#检查用户umask设置
+
+sed -i '/umask/s/002/077/' /etc/csh.cshrc_bak$date
+sed -i '/umask/s/002/077/' /etc/bashrc_bak$date
+sed -i '/umask/s/002/077/' /etc/profile_bak$date
+
+csh_login=cat /etc/csh.login_bak$date | grep -i "umask"
+if [ -z "$csh_login" ];then
+  echo -e "/numask 077" >> /etc/csh.login_bak$date
+fi
+
+
+
+
+#设置重要文件目录权限
+
+
+
+ch_600_list="/etc/grub.conf
+/etc/grub2.cfg
+/boot/grub/grub.conf
+/boot/grub2/grub.cfg
+/etc/lilo.conf
+/etc/xinetd.conf
+/etc/inetd.conf
+/etc/security"
+
+for i in $ch_600_list
+do
+    ls $i
+    echo "chmod 600 $i"
+    #chmod 600 $i
+done
+
+
+# /etc/ 启动了nscd服务导致设置权限以后无法登陆
+
+ch_750_list="/etc/
+/tmp/
+/etc/rc0.d/
+/etc/rc1.d/
+/etc/rc2.d/
+/etc/rc3.d
+/etc/rc4.d/
+/etc/rc5.d/
+/etc/rc6.d/
+/etc/rc.d/init.d/"
+
+for i in $ch_750_list
+do
+    ls $i
+    echo "chmod 750 $i"
+    #chmod 750 $i
+done
+
+
+# limit chmod important commands
+
+ch_700_list="/bin/ping
+/usr/bin/finger
+/usr/bin/who
+/usr/bin/w
+/usr/bin/locate
+/usr/bin/whereis
+/sbin/ifconfig
+/usr/bin/pico
+/bin/vi
+/usr/bin/which
+/usr/bin/gcc
+/usr/bin/make
+/bin/rpm"
+
+for i in $ch_700_list
+do
+    ls $i
+    echo "chmod 700 $i"
+    #chmod 700 $i
+done
+
+
+
+
+cp /etc/shadow /etc/shadow_bak$date
+cp /etc/passwd /etc/passwd_bak$date
+cp /etc/group /etc/group_bak$date
+cp /etc/services /etc/services_bak$date
+cp /etc/rc.local /etc/rc.local_bak$date
+cp /root/.bash_history /root/.bash_history_bak$date
+
+#chmod 000 /etc/shadow
+#chmod 644 /etc/passwd
+#chmod 644 /etc/group
+#chmod 644 /etc/services
+#chmod 644 /etc/rc.local
+
+# chattr /etc/passwd /etc/shadow
+
+chattr +i /etc/shadow
+chattr +i /etc/passwd
+chattr +i /etc/group
+chattr +i /etc/gshadow
+
+
+# history security
+
+chattr +a /root/.bash_history
+chattr +i /root/.bash_history
+
+
+
+cp /etc/sysctl.conf /etc/sysctl.conf_bak$date
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config_bak$date
+
+# add syncookie enable /etc/sysctl.conf
+echo "net.ipv4.tcp_syncookies = 1" >> /etc/sysctl.conf
+
+# exec sysctl.conf enable
+sysctl -p
+
+
+# optimizer sshd_config
+
+sed -i 's/#MaxAuthTries 6/MaxAuthTries 9/' /etc/ssh/sshd_config
+sed -i '/UseDNS/a\UseDNS no' /etc/ssh/sshd_config
+sed -i 's/^GSSAPIAuthentication yes/GSSAPIAuthentication no/g' /etc/ssh/sshd_config
+
+/etc/init.d/sshd restart
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/var/log/audit/audit.log
+/var/log/boot.log
+/var/log/btmp
+/var/log/cron
+/var/log/dmesg
+/var/log/lastlog
+/var/log/messages
+/var/log/secure
+/var/log/wtmp
+
+
+
+
+awk '($3 == "ext2" || $3 == "ext3") { print $2 }' /etc/fstab
+
+
+
+
+
+
+禁止root
+
+
+su
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# write important command md5
+cat > list << "EOF"
+/bin/awk
+/bin/bash
+/bin/cat
+/bin/cd
+/bin/chattr
+/bin/chmod
+/bin/chown
+/bin/cp
+/bin/echo
+/bin/id
+/bin/mkdir
+/bin/mv
+/bin/passwd
+/bin/perl
+/bin/pico
+/bin/ping
+/bin/pkill
+/bin/ps
+/bin/python
+/bin/rm
+/bin/rpm
+/bin/rmdir
+/bin/rsync
+/bin/scp
+/bin/sed
+/bin/sleep
+/bin/ssh
+/bin/su
+/bin/sudo
+/bin/sync
+/bin/systemctl
+/bin/tar
+/bin/tee
+/bin/test
+/bin/top
+/bin/touch
+/bin/tree
+/bin/true
+/bin/uptime
+/bin/vi
+/bin/vim
+/bin/virsh
+/bin/w
+/bin/wc
+/bin/wget
+/bin/whereis
+/bin/which
+/bin/who
+/bin/whoami
+/bin/xz
+/bin/yes
+/bin/yum
+
+
+/usr/bin/awk
+/usr/bin/chattr
+/usr/bin/diff
+/usr/bin/du
+/usr/bin/file
+/usr/bin/find
+/usr/bin/free
+/usr/bin/hostname
+/usr/bin/hostnamectl
+/usr/bin/id
+/usr/bin/kill
+/usr/bin/killall
+/usr/bin/last
+/usr/bin/lastb
+/usr/bin/less
+/usr/bin/locale
+/usr/bin/make
+/usr/bin/passwd
+/usr/bin/perl
+/usr/bin/pkill
+/usr/bin/pstree
+/usr/bin/python
+/usr/bin/qemu-img
+/usr/bin/rsync
+/usr/bin/scp
+/usr/bin/seq
+/usr/bin/ssh
+/usr/bin/sudo
+/usr/bin/tail
+/usr/bin/tee
+/usr/bin/test
+/usr/bin/uptime
+/usr/bin/vim
+/usr/bin/virsh
+/usr/bin/virt-install
+/usr/bin/w
+/usr/bin/wc
+/usr/bin/wget
+/usr/bin/whereis
+/usr/bin/which
+/usr/bin/who
+/usr/bin/whoami
+/usr/bin/xz
+/usr/bin/yes
+/usr/bin/yum
+
+/sbin/chkconfig
+/sbin/fdisk
+/sbin/grub
+/sbin/ifconfig
+/sbin/ifdown
+/sbin/ifup
+/sbin/ip
+/sbin/lvcreate
+/sbin/lvm
+/sbin/mkfs
+/sbin/mkfs.ext4
+/sbin/mkfs.xfs
+/sbin/parted
+/sbin/partx
+/sbin/poweroff
+/sbin/pvcreate
+/sbin/reboot
+/sbin/restart
+/sbin/start
+/sbin/status
+/sbin/stop
+/sbin/sysctl
+
+/usr/sbin/ss
+/usr/sbin/useradd
+/usr/sbin/userdel
+/usr/sbin/usermod
+
+
+
+
+
+ntpdate
+
+EOF
+
+for i in `cat list`
+do
+   if [ ! -x $i ];then
+   echo "$i not found,no md5sum!"
+  else
+   md5sum $i >> /var/log/`hostname`.log
+  fi
+done
+rm -f list
+
+
+
+
+for i in `cat list`
+do
+  if [ -f $i ]
+  then
+    echo "$i exist!"
+  else
+    echo "$i is not exist!"
+  fi
+done
+
+
+
+
+
+
+
+
+
+
+
+
+

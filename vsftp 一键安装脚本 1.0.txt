@@ -1,0 +1,152 @@
+默认
+
+开anonymous，映射目录：/var/ftp
+建立一个虚拟用户ftp_user，密码ftp_user_password，映射目录：/var/www/html
+
+
+
+
+
+
+vi vsftp_install.sh
+i
+
+
+
+#!/bin/bash
+
+
+web_root="/var/www/html"
+ftp_port="21"
+
+vsftpd_root="/etc/vsftpd"
+ftp_config="/etc/vsftpd/vsftpd.conf"
+ftp_pam="/etc/pam.d/vsftpd"
+current_path=`pwd`
+
+ftp_user="ftp_user"
+ftp_password="${ftp_user}_password"
+
+echo "****************************************************"
+echo "ftp_user    : ${ftp_user}"
+echo "ftp_password: ${ftp_password}"
+echo "****************************************************"
+
+vsftp_install()
+{
+#selinux=`cat /etc/selinux/config |grep "SELINUX=" |grep -v "# SELINUX" |cut -c 9-17`
+selinux=`sestatus | awk -F "[: ]+" '{print $3}' | sed -n '1p'`
+if [ "$selinux" = "enabled" ]; then
+    sed -i '/SELINUX/s/enforcing/disabled/' /etc/selinux/config
+    setenforce 0
+    echo "****************************************************"
+    echo "            selinux is disabled !"    
+    echo "****************************************************"
+    echo ""
+    sleep 3
+fi
+
+    /sbin/service iptables status 1>/dev/null 2>&1
+    if [ "$?" == "0" ];then
+        #/sbin/iptables -I INPUT -p udp --dport 1194 -j ACCEPT
+        #/etc/rc.d/init.d/iptables save
+        #/etc/init.d/iptables restart
+        /etc/init.d/iptables stop
+        echo "****************************************************"
+        echo "            iptables is disabled!"
+        echo "****************************************************"
+    fi
+
+echo ""
+echo "****************************************************"
+echo "            Installing vsftpd..."
+echo "****************************************************"
+
+#ftp download/upload directory in web_root
+
+httpd_user=`cat /etc/passwd |grep apache |awk -F ":" '{print $1}'`
+nginx_user=`cat /etc/passwd |grep nginx |awk -F ":" '{print $1}'`
+
+unalias cp >> /dev/null 2>&1
+
+if [ ! -d $web_root ]; then
+    mkdir -p $web_root
+fi
+
+#ftp vitural user 
+if [ "$httpd_user" != "apache" -a "$nginx_user" != "nginx" ]; then
+        /usr/sbin/useradd apache -s /sbin/nologin >>/dev/null 2>&1
+fi
+chown -R apache:apache $web_root
+
+echo "YUM install vsftpd..."
+
+
+
+yum install -y vsftpd db4-utils db4 db4-devel
+
+echo "****************************************************"
+echo "            Configuration vsftpd..."
+echo "****************************************************"
+
+mkdir -p $vsftpd_root/conf.d
+
+#vsftpd virt l user config
+cat > $vsftpd_root/conf.d/${ftp_user} <<end..
+guest_enable=YES
+guest_username=apache
+local_root=$web_root
+anon_world_readable_only=no
+anon_upload_enable=yes
+anon_mkdir_write_enable=yes
+anon_other_write_enable=yes
+anon_umask=022
+end..
+
+#default ftp_user user and password
+cat > $vsftpd_root/vuser.txt <<end..
+${ftp_user}
+${ftp_password}
+end..
+
+#default www user and password
+cat > $vsftpd_root/rebuild_${ftp_user}.sh <<end..
+/usr/bin/db_load -T -t hash -f $vsftpd_root/vuser.txt  $vsftpd_root/db_vuser.db
+end..
+
+if [ ! -x $vsftpd_root/rebuild_${ftp_user}.sh ]; then
+        chmod +x $vsftpd_root/rebuild_${ftp_user}.sh
+fi
+$vsftpd_root/rebuild_${ftp_user}.sh
+
+
+cp $ftp_config $vsftpd_root/vsftpd.conf.back
+/bin/sed -i "$ a\listen_port=$ftp_port" $ftp_config
+/bin/sed -i '$ a\use_localtime=YES' $ftp_config
+/bin/sed -i "$ a\user_config_dir=$vsftpd_root/conf.d" $ftp_config
+
+#/etc/pam.d/vsftpd 
+
+cp $ftp_pam /etc/pam.d/vsftpd.back
+/bin/sed -i '1,8 s/^/#/' $ftp_pam
+/bin/sed -i "$ a\auth     required   pam_userdb.so  db=$vsftpd_root/db_vuser" $ftp_pam
+/bin/sed -i "$ a\account  required   pam_userdb.so  db=$vsftpd_root/db_vuser" $ftp_pam
+
+alias cp='cp -i'
+chkconfig vsftpd on
+service vsftpd restart
+
+cat <<end..
+****************************************************
+            Vsftpd installed ...
+****************************************************
+end..
+
+}
+
+vsftp_install
+
+
+
+
+

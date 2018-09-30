@@ -1,0 +1,267 @@
+
+
+
+SaltStack 配置管理 SLS编写技巧
+
+
+/etc/resolv.conf
+  file.managed:
+    - source: salt://init/files/resolv.conf
+    - user: root
+    - group: root
+    - mode: 644
+
+
+
+
+
+缩进（两空格）表示层级关系
+
+; 加空格，对应字典
+
+短 - 加 空格，表示列表
+
+
+
+
+
+cat > /etc/sysconfig/network-scripts/ifcfg-eth0 <<eof
+
+TYPE=Ethernet
+NAME=eth0
+#DEVICE=eth0
+BOOTPROTO=static
+ONBOOT=yes
+IPADDR=175.25.181.144
+NETMASK=255.255.255.128
+GATEWAY=175.25.181.129
+
+eof
+
+
+
+cat /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+175.25.181.144 salt1 salt1.duoyichen.cn
+175.25.181.145 salt2 salt2.duoyichen.cn
+
+
+
+
+yum install -y epel-release
+yum install -y salt-master salt-minion
+
+
+
+yum install -y epel-release
+yum install -y salt-minion
+
+
+
+vim /etc/salt/minion
+master: salt1.duoyichen.cn
+
+
+
+/etc/init.d/salt-master start
+/etc/init.d/salt-minion start
+
+
+/etc/init.d/salt-minion start
+
+
+
+
+
+salt-key -a salt1.duoyichen.cn
+
+
+/etc/init.d/iptables stop
+
+
+salt-key
+
+Accepted Keys:
+salt1.duoyichen.cn
+salt2.duoyichen.cn
+Denied Keys:
+Unaccepted Keys:
+Rejected Keys:
+
+
+salt '*' test.ping
+
+
+
+salt '*' cmd.run "df -h"
+
+
+
+salt 'salt1.duoyichen.cn' grains.ls
+
+salt 'salt1.duoyichen.cn' grains.items
+
+
+
+
+
+
+自定义 grains （在 salt1 上）
+
+
+vim /etc/salt/grains
+
+role: nginx
+env: test
+myname: tpp
+
+或
+
+  role:
+    - nginx
+  env:
+    - test
+  myname:
+    - tpp
+
+或
+
+vim /etc/salt/minion
+
+grains:
+  role:
+    - nginx
+  env:
+    - test
+  myname:
+    - tpp
+
+
+/etc/init.d/salt-minion restart
+
+
+salt -G os:CentOS cmd.run 'hostname'
+salt1.duoyichen.cn:
+    salt1
+salt2.duoyichen.cn:
+    salt2
+
+salt -G role:nginx cmd.run 'hostname'
+salt1.duoyichen.cn:
+    salt1
+
+
+
+
+salt 'salt1.duoyichen.cn' grains.item role env myname
+
+salt1.duoyichen.cn:
+    ----------
+    env:
+        test
+    myname:
+        tpp
+    role:
+        nginx
+
+
+
+salt 'salt1.duoyichen.cn' grains.get myname
+
+salt1.duoyichen.cn:
+    tpp
+
+
+
+salt 'salt1.duoyichen.cn' grains.get myname
+salt1.duoyichen.cn:
+    tpp
+
+salt -G role:nginx cmd.run 'hostname'
+salt1.duoyichen.cn:
+    salt1
+
+salt -G os:CentOS cmd.run 'hostname'
+salt1.duoyichen.cn:
+    salt1
+salt2.duoyichen.cn:
+    salt2
+
+
+
+
+
+salt 'salt2.duoyichen.cn' pillar.items
+
+salt2.duoyichen.cn:
+    ----------
+
+salt 'salt2.duoyichen.cn' pillar.item conf
+salt2.duoyichen.cn:
+    ----------
+    conf:
+        /etc/123.conf
+
+salt 'salt2.duoyichen.cn' pillar.item myname
+salt2.duoyichen.cn:
+    ----------
+    myname:
+        tpp
+
+
+
+salt -I 'conf:/etc/123.conf' test.ping
+
+salt2.duoyichen.cn:
+    True
+
+salt -I 'conf:/etc/123.conf' cmd.run 'w'
+
+salt2.duoyichen.cn:
+     07:06:12 up  1:29,  1 user,  load average: 0.12, 0.08, 0.06
+    USER     TTY      FROM              LOGIN@   IDLE   JCPU   PCPU WHAT
+    root     pts/0    223.255.127.166  05:37    1:12   0.03s  0.03s -bash
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
