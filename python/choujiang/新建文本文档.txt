@@ -1,0 +1,22 @@
+AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz0123456789
+
+
+
+
+
+1  中奖的序号
+2  兑换码
+3  剩余次数
+4  奖品列表
+
+
+
+
+
+
+
+create database jiangpin;
+
+use jiangpin;
+
+create table jiangpin(id INT NOT NULL,sn VARCHAR(10) not null,cs int,j_list varchar(100) not null,primary key(id));

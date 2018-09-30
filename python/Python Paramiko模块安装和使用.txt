@@ -1,0 +1,38 @@
+
+
+
+
+yum install -y python-devel python-pip libcffi libffi-devel openssl openssl-devel
+
+# python-cffi gcc pycrypto
+
+
+pip install paramiko
+
+
+
+
+vi paramiko_ssh.py
+i
+
+#!/usr/bin/python
+import paramiko
+
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect("123.58.251.111",22,"root", "12345678Cm")
+stdin, stdout, stderr = ssh.exec_command("df -h")
+print stdout.readlines()
+ssh.close()
+
+
+
+自己写的脚本名称不能为 paramiko.py ，否则报错：
+
+[root@localhost ~]# python paramiko.py
+Traceback (most recent call last):
+  File "paramiko.py", line 3, in <module>
+    import paramiko
+  File "/root/paramiko.py", line 7, in <module>
+    ssh = paramiko.SSHClient()
+AttributeError: 'module' object has no attribute 'SSHClient'

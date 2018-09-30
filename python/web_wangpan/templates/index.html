@@ -1,0 +1,52 @@
+$def with(data='',ip='')
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		$if data:
+			<title>$:data.filename - 快捷文件分享</title>
+		$else:
+			<title>免费文件快捷文件分享 - 潭州Python学院</title>
+		<link rel="stylesheet" href="/static/css/bootstrap.min.css" />
+		<style>
+		 *{margin:0;padding:0;}
+             	 .ti{line-height:80px;text-align:center;font-weight:300;color:#000000;font-size: 30px;}
+		</style>
+	</head>
+	<body>
+	<div class="ti">
+	<span>免费快捷文件分享系统 - 潭州Python学院</span>
+	</div>
+		<div class="container">
+			<h1 class="page-header">分享文件</h1>
+			<form class="form-horizontal" enctype="multipart/form-data" action="/upload" method="post">
+				<div class="form-group">
+					<div class="col-md-5">
+						<input type="file" name="file" />
+					</div>
+				</div>
+				<div class="form-group">
+					<div class="col-md-5">
+						<button type="submit" class="btn-primary">上   传</button>
+					</div>
+				</div>
+			</form>
+		</div>
+		$if data:
+		<div class="container">
+			<h1 class="page-header">下载文件</h1>
+			<h3>文件名:<b><span style="color: red;">$:data.filename<span></b></h3>
+		$if not ip:
+			<h3>上传IP:$:(data.ip.split('.')[0]+'.*.*.'+data.ip.split('.')[-1])</h3>
+		$else:
+			<h3>上传IP:$:ip</h3>
+			
+			
+		<h3>上传时间:$:data.time</h3>
+		<h3>下载次数:$:data.download</h3>
+		$if ip:
+			<h3><a class="btn btn-primary" href="/delete/$:data.key">删除</a></h3>
+		<a class="btn btn-primary"  href="/file/$:data.filename?key=$:data.key"  target="_black"/>下载文件</a>
+			</div>
+	</body>
+</html>

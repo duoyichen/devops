@@ -1,0 +1,86 @@
+#!/usr/bin/env Python
+
+#coding:utf-8
+
+import re
+import requests
+import sys
+import MySQLdb
+import time
+
+from multiprocessing import Pool
+
+class get_html(object):
+    
+    def __init__(self,page):
+        
+        self.page=page
+        
+        
+    def fetch_html(self):
+        try:
+        
+            url='http://www.qiushibaike.com/hot/page/{page}/?s=4954834'
+            num=0
+            while num<self.page:
+                num +=1
+                new_url=url.format(page=num)
+                post=requests.get(new_url)
+            #post.encoding='utf8'
+                print new_url
+                html=[]
+                html.append(post.text.encode('utf-8'))
+               #print html
+        except Exception as e:
+            print e
+        return html
+        
+    def insert_html(self):
+        db = MySQLdb.connect("localhost","root","123456","html",charset="utf8")
+        cursor=db.cursor()
+        html=self.fetch_html()
+        
+        for n in range(len(html)):
+            new_html=html[n]
+
+        #print html
+            f=re.compile(r'<div class="content">(.*?)</span>',re.S)
+            o=re.findall(f,new_html)
+    
+            for s in range(len(o)):
+                new_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                d=o[s]
+                new_1=d.replace('<span>','')
+                fetch_html=new_1.replace('<br/>','')
+             #  print fetch_html
+                sql='insert into get_html values(%s,%s)'
+                param=(new_time,fetch_html)
+                cursor.execute(sql,param)
+        cursor.close()
+        db.commit()
+        db.close()
+    def main(self):
+        pool = Pool(processes=3)    # set the processes max number 3
+        res_list=[]
+        for i in range(3):
+            result = pool.apply_async(self.insert_html())
+            res_list.append(result)
+        pool.close()
+        pool.join()
+'''   def insert(self):
+        new_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        db = MySQLdb.connect("localhost","root","123456","html")
+        cursor=db.cursor()
+        sql='insert into get_html values(%s,%s)'
+        param=(new_time,'sg')
+        cursor.execute(sql,param)
+        cursor.close()
+        db.commit()
+     db.close()
+''' 
+if __name__ == "__main__":
+
+    new_html=get_html(20)
+    #ew_html.fetch_html()
+    
+    new_html.main()
