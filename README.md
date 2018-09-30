@@ -52,7 +52,7 @@ cacti = {'599':"Chaoxing_HI", '600':"Chaoxing_OS", '352':"DFRT_Uplink"}<br>
 
 for k,v in cacti.items():<br>
     print(k)<br>
-    request = urllib2.Request("http://106.3.37.133/graph_image.php?local_graph_id=%s&rra_id=0&view_type=tree&graph_start=%s&graph_end=%s"%(k,start,end),None,headers)<br>
+    request = urllib2.Request("http://106.3.37.133/graph_image.php?local_graph_id=%s&rra_id=0&view_type=tree&graph_start=%s&graph_end=%s" %(k,start,end),None,headers)<br>
     res = urlOpener.open(request).read()<br>
     path = '/var/www/html/o/cacti' + '/' + '%s'%date2 + '/' + '%s'%v <br>
     print(path)<br>
