@@ -6,6 +6,9 @@ Operations, Shell, Python, MySql, Html, JavaScript ... etc.
 ## python 自动登陆 cacti 获取主机流量图
 <br>
 
+https://github.com/duoyichen/devops/blob/master/cacti_screenshot.py.txt<br>
+
+
 \#/usr/bin/env python<br>
 \# -*- coding: utf-8 -*-<br>
 import os,time,datetime,socket,urllib,urllib2,cookielib<br>
