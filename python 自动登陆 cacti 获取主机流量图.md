@@ -1,14 +1,12 @@
 <br>
-
-
 ## python 自动登陆 cacti 获取主机流量图
 <br>
 
 https://github.com/duoyichen/devops/blob/master/cacti_screenshot.py.txt<br>
 
 ```python
-\#/usr/bin/env python
-\# -*- coding: utf-8 -*-
+#/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os,time,datetime,socket,urllib,urllib2,cookielib
 
 
