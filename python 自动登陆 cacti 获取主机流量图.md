@@ -1,8 +1,8 @@
-<br>
 ## python 自动登陆 cacti 获取主机流量图
 <br>
 
 https://github.com/duoyichen/devops/blob/master/cacti_screenshot.py.txt<br>
+
 
 ```python
 #/usr/bin/env python
